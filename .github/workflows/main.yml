@@ -2,14 +2,16 @@ name: CI-CD
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
 
   workflow_dispatch:
 
 jobs:
 
   # ============================================================
-  # CI - Build da imagem e Push para OCIR
+  # CI
+  # Build da imagem Docker e Push para o OCI Container Registry
   # ============================================================
   CI:
     name: CI - Build e Push
@@ -17,9 +19,16 @@ jobs:
 
     steps:
 
+      # ----------------------------------------------------------
+      # Checkout
+      # ----------------------------------------------------------
       - name: Obtendo o código
         uses: actions/checkout@v4
 
+
+      # ----------------------------------------------------------
+      # Login no OCI Container Registry
+      # ----------------------------------------------------------
       - name: Login to OCIR
         uses: docker/login-action@v3
         with:
@@ -27,39 +36,46 @@ jobs:
           username: ${{ secrets.OCI_USERNAME }}
           password: ${{ secrets.OCI_TOKEN }}
 
+
+      # ----------------------------------------------------------
+      # Build e Push da imagem
+      # ----------------------------------------------------------
       - name: Build e Push da Imagem Docker
         uses: docker/build-push-action@v6
         with:
           context: ./src
           file: ./src/Dockerfile
           push: true
+
           tags: |
             gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
             gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:latest
 
 
   # ============================================================
-  # CD - Deploy no Kubernetes / OKE
+  # CD
+  # Deploy no Oracle Kubernetes Engine - OKE
   # ============================================================
   CD:
     name: CD - Deploy OKE
     runs-on: ubuntu-latest
-    needs: [CI]
+
+    needs:
+      - CI
 
     steps:
 
+      # ----------------------------------------------------------
+      # Checkout
+      # ----------------------------------------------------------
       - name: Obtendo o código
         uses: actions/checkout@v4
 
 
-      # --------------------------------------------------------
-      # Instala OCI CLI
-      # --------------------------------------------------------
-      # O K8S_CONFIG utiliza o OCI CLI como credential plugin.
-      # Sem o "oci" instalado, o kubectl apresenta:
-      #
-      # executable oci not found
-      # --------------------------------------------------------
+      # ==========================================================
+      # OCI CLI
+      # ==========================================================
+
       - name: Instalar OCI CLI
         run: |
           curl -L -o install.sh \
@@ -67,21 +83,25 @@ jobs:
 
           bash install.sh --accept-all-defaults
 
-          echo "$HOME/bin" >> $GITHUB_PATH
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
 
-      # --------------------------------------------------------
-      # Verifica instalação do OCI CLI
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
+      # Verificar OCI CLI
+      # ----------------------------------------------------------
       - name: Verificar OCI CLI
         run: |
+          echo "PATH=$PATH"
+
           which oci
+
           oci --version
 
 
-      # --------------------------------------------------------
-      # Configura credenciais do OCI
-      # --------------------------------------------------------
+      # ==========================================================
+      # Configuração das credenciais OCI
+      # ==========================================================
+
       - name: Configurar OCI CLI
         env:
           OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
@@ -91,12 +111,16 @@ jobs:
           OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
 
         run: |
+
           mkdir -p ~/.oci
 
-          printf '%s\n' "$OCI_CLI_KEY_CONTENT" > ~/.oci/oci_api_key.pem
+          # Cria a chave privada
+          printf '%s\n' "$OCI_CLI_KEY_CONTENT" \
+            > ~/.oci/oci_api_key.pem
 
           chmod 600 ~/.oci/oci_api_key.pem
 
+          # Cria configuração do OCI CLI
           cat > ~/.oci/config <<EOF
           [DEFAULT]
           user=$OCI_CLI_USER
@@ -106,10 +130,24 @@ jobs:
           key_file=$HOME/.oci/oci_api_key.pem
           EOF
 
+          chmod 600 ~/.oci/config
 
-      # --------------------------------------------------------
-      # Configuração do contexto Kubernetes
-      # --------------------------------------------------------
+
+      # ----------------------------------------------------------
+      # Testar autenticação OCI
+      # ----------------------------------------------------------
+      - name: Testar autenticação OCI
+        run: |
+          oci iam region list --output table
+
+
+      # ==========================================================
+      # Kubernetes
+      # ==========================================================
+
+      # ----------------------------------------------------------
+      # Configurar kubeconfig
+      # ----------------------------------------------------------
       - name: Configuração de contexto do Kubernetes
         uses: azure/k8s-set-context@v4
         with:
@@ -117,23 +155,74 @@ jobs:
           kubeconfig: ${{ secrets.K8S_CONFIG }}
 
 
-      # --------------------------------------------------------
-      # Testa acesso ao OKE
-      # --------------------------------------------------------
-      - name: Testar acesso ao Kubernetes
+      # ----------------------------------------------------------
+      # Verificar kubeconfig
+      # ----------------------------------------------------------
+      - name: Verificar Kubernetes
         run: |
-          kubectl cluster-info
+          echo "Testando conexão com o OKE..."
+
+          which kubectl
+          kubectl version --client
+
           kubectl get nodes
 
 
-      # --------------------------------------------------------
-      # Deploy
-      # --------------------------------------------------------
-      - name: Execução do Manifesto
-        uses: Azure/k8s-deploy@v5
-        with:
-          manifests: |
-            ./k8s/deployment.yaml
+      # ==========================================================
+      # DEPLOY
+      # ==========================================================
 
-          images: |
-            gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
+      # ----------------------------------------------------------
+      # Aplicar Deployment
+      # ----------------------------------------------------------
+      - name: Aplicar Manifesto
+        run: |
+          kubectl apply \
+            -f ./k8s/deployment.yaml
+
+
+      # ----------------------------------------------------------
+      # Atualizar imagem
+      # ----------------------------------------------------------
+      - name: Atualizar imagem
+        run: |
+
+          kubectl set image deployment/primeira-pipeline-cicd \
+            primeira-pipeline-cicd=gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
+
+
+      # ----------------------------------------------------------
+      # Aguardar rollout
+      # ----------------------------------------------------------
+      - name: Aguardar Rollout
+        run: |
+
+          kubectl rollout status \
+            deployment/primeira-pipeline-cicd \
+            --timeout=10m
+
+
+      # ----------------------------------------------------------
+      # Verificar pods
+      # ----------------------------------------------------------
+      - name: Verificar Deploy
+        run: |
+
+          echo "======================================"
+          echo "DEPLOY REALIZADO COM SUCESSO"
+          echo "======================================"
+
+          echo "Imagem:"
+          echo "gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}"
+
+          echo ""
+          echo "Pods:"
+          kubectl get pods
+
+          echo ""
+          echo "Deployments:"
+          kubectl get deployments
+
+          echo ""
+          echo "Services:"
+          kubectl get services
