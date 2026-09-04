@@ -154,24 +154,6 @@ jobs:
           method: kubeconfig
           kubeconfig: ${{ secrets.K8S_CONFIG }}
 
-
-      # ----------------------------------------------------------
-      # Verificar kubeconfig
-      # ----------------------------------------------------------
-      - name: Verificar Kubernetes
-        run: |
-          echo "Testando conexão com o OKE..."
-
-          which kubectl
-          kubectl version --client
-
-          kubectl get nodes
-
-
-      # ==========================================================
-      # DEPLOY
-      # ==========================================================
-
       # ----------------------------------------------------------
       # Aplicar Deployment
       # ----------------------------------------------------------
@@ -179,50 +161,3 @@ jobs:
         run: |
           kubectl apply \
             -f ./k8s/deployment.yaml
-
-
-      # ----------------------------------------------------------
-      # Atualizar imagem
-      # ----------------------------------------------------------
-      - name: Atualizar imagem
-        run: |
-
-          kubectl set image deployment/primeira-pipeline-cicd \
-            primeira-pipeline-cicd=gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
-
-
-      # ----------------------------------------------------------
-      # Aguardar rollout
-      # ----------------------------------------------------------
-      - name: Aguardar Rollout
-        run: |
-
-          kubectl rollout status \
-            deployment/primeira-pipeline-cicd \
-            --timeout=10m
-
-
-      # ----------------------------------------------------------
-      # Verificar pods
-      # ----------------------------------------------------------
-      - name: Verificar Deploy
-        run: |
-
-          echo "======================================"
-          echo "DEPLOY REALIZADO COM SUCESSO"
-          echo "======================================"
-
-          echo "Imagem:"
-          echo "gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}"
-
-          echo ""
-          echo "Pods:"
-          kubectl get pods
-
-          echo ""
-          echo "Deployments:"
-          kubectl get deployments
-
-          echo ""
-          echo "Services:"
-          kubectl get services
