@@ -110,6 +110,11 @@ jobs:
       # Aplicar Deployment
       # ----------------------------------------------------------
       - name: Aplicar Manifesto
-        run: |
-          kubectl apply \
-            -f ./k8s/deployment.yaml
+        uses: Azure/k8s-deploy@v7
+        with:
+          manifests: |
+            ./k8s/deployment.yaml
+          images: |
+            gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
+          imagepullsecrets: |
+            ocir-secret
