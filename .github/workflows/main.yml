@@ -71,6 +71,13 @@ jobs:
       - name: Obtendo o código
         uses: actions/checkout@v4
 
+      - name: Login to OCIR
+        uses: docker/login-action@v3
+        with:
+          registry: gru.ocir.io
+          username: ${{ secrets.OCI_USERNAME }}
+          password: ${{ secrets.OCI_TOKEN }}
+
 
       # ==========================================================
       # OCI CLI
