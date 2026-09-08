@@ -78,12 +78,8 @@ jobs:
 
       - name: Instalar OCI CLI
         run: |
-          curl -L -o install.sh \
-            https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh
-
-          bash install.sh --accept-all-defaults
-
-          echo "$HOME/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --upgrade pip
+          python3 -m pip install oci-cli
 
 
       # ----------------------------------------------------------
@@ -96,51 +92,7 @@ jobs:
           which oci
 
           oci --version
-
-
-      # ==========================================================
-      # Configuração das credenciais OCI
-      # ==========================================================
-
-      - name: Configurar OCI CLI
-        env:
-          OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
-          OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
-          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
-          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
-          OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
-
-        run: |
-
-          mkdir -p ~/.oci
-
-          # Cria a chave privada
-          printf '%s\n' "$OCI_CLI_KEY_CONTENT" \
-            > ~/.oci/oci_api_key.pem
-
-          chmod 600 ~/.oci/oci_api_key.pem
-
-          # Cria configuração do OCI CLI
-          cat > ~/.oci/config <<EOF
-          [DEFAULT]
-          user=$OCI_CLI_USER
-          fingerprint=$OCI_CLI_FINGERPRINT
-          tenancy=$OCI_CLI_TENANCY
-          region=$OCI_CLI_REGION
-          key_file=$HOME/.oci/oci_api_key.pem
-          EOF
-
-          chmod 600 ~/.oci/config
-
-
-      # ----------------------------------------------------------
-      # Testar autenticação OCI
-      # ----------------------------------------------------------
-      - name: Testar autenticação OCI
-        run: |
-          oci iam region list --output table
-
-
+          
       # ==========================================================
       # Kubernetes
       # ==========================================================
