@@ -154,6 +154,7 @@ jobs:
       - name: Aplicar Manifesto
         uses: Azure/k8s-deploy@v7
         with:
+          namespace: 'producao'
           manifests: |
             ./k8s/deployment.yaml
           images: |
