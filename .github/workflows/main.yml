@@ -54,6 +54,7 @@ jobs:
     needs: [CI]
     uses: wesleymlopes/primeira-pipeline-cicd/.github/workflows/deploy.yaml@main
     with:
+      namespace: homolog
       manifests: k8s/deployment.yaml
       images: gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
     secrets: inherit

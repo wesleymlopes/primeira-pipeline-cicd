@@ -10,6 +10,10 @@ on:
             type: string
             required: true
             description: "Imagens que serão alteradas nos manifestos"
+        namespace:
+            type: string
+            required: true
+            description: "Namespace que será feito Deploy"
 
 jobs:
   deploy-k8s:
@@ -106,7 +110,7 @@ jobs:
       - name: Aplicar Manifesto
         uses: Azure/k8s-deploy@v7
         with:
-          namespace: 'producao'
+          namespace: ${{inputs.namespace}}
           manifests: ${{inputs.manifests}}
           images: ${{inputs.images}}
           imagepullsecrets: |
