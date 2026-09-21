@@ -50,10 +50,10 @@ jobs:
           tags: |
             gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
             gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:latest
-    CD:
-      needs: [CI]
-      uses: wesleymlopes/primeira-pipeline-cicd/.github/workflows/deploy.yaml@main
-      with:
-        manifests: k8s/deployment.yaml
-        images: gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
-      secrets: inherit
+  CD:
+    needs: [CI]
+    uses: wesleymlopes/primeira-pipeline-cicd/.github/workflows/deploy.yaml@main
+    with:
+      manifests: k8s/deployment.yaml
+      images: gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
+    secrets: inherit
