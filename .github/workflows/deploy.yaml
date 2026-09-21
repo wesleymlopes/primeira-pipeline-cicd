@@ -1,0 +1,114 @@
+name: Deploy no Kubernetes
+on:
+    workflow_call:
+      inputs:
+        manifests:
+            type: string
+            required: true
+            description: "Arquivos manifesto para deploy"
+        images:
+            type: string
+            required: true
+            description: "Imagens que serão alteradas nos manifestos"
+
+jobs:
+  deploy-k8s:
+    name: CD - Deploy OKE
+    runs-on: ubuntu-latest
+    steps:
+
+      # ----------------------------------------------------------
+      # Checkout
+      # ----------------------------------------------------------
+      - name: Obtendo o código
+        uses: actions/checkout@v4
+
+      - name: Login to OCIR
+        uses: docker/login-action@v3
+        with:
+          registry: gru.ocir.io
+          username: ${{ secrets.OCI_USERNAME }}
+          password: ${{ secrets.OCI_TOKEN }}
+
+
+      # ==========================================================
+      # OCI CLI
+      # ==========================================================
+
+      - name: Instalar OCI CLI
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install oci-cli
+
+
+      # ----------------------------------------------------------
+      # Verificar OCI CLI
+      # ----------------------------------------------------------
+      - name: Verificar OCI CLI
+        run: |
+          echo "PATH=$PATH"
+
+          which oci
+
+          oci --version
+
+
+      # ==========================================================
+      # Configuração das credenciais OCI
+      # ==========================================================
+
+      - name: Configurar OCI CLI
+        env:
+          OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+          OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+          OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
+
+        run: |
+
+          mkdir -p ~/.oci
+
+          # Cria a chave privada
+          printf '%s\n' "$OCI_CLI_KEY_CONTENT" > ~/.oci/oci_api_key.pem
+
+          chmod 600 ~/.oci/oci_api_key.pem
+
+          # Cria configuração do OCI CLI
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=$OCI_CLI_USER
+          fingerprint=$OCI_CLI_FINGERPRINT
+          tenancy=$OCI_CLI_TENANCY
+          region=$OCI_CLI_REGION
+          key_file=$HOME/.oci/oci_api_key.pem
+          EOF
+
+          chmod 600 ~/.oci/config
+
+          
+      # ==========================================================
+      # Kubernetes
+      # ==========================================================
+
+      # ----------------------------------------------------------
+      # Configurar kubeconfig
+      # ----------------------------------------------------------
+      - name: Configuração de contexto do Kubernetes
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.K8S_CONFIG }}
+
+      # ----------------------------------------------------------
+      # Aplicar Deployment
+      # ----------------------------------------------------------
+      - name: Aplicar Manifesto
+        uses: Azure/k8s-deploy@v7
+        with:
+          namespace: 'producao'
+          manifests: ${{inputs.manifests}}
+          images: ${{inputs.images}}
+          imagepullsecrets: |
+            ocir-secret
+
