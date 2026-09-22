@@ -2,9 +2,7 @@ name: CI-CD
 
 on:
   push:
-    branches:
-      - main
-
+  
   workflow_dispatch:
 
 jobs:
@@ -50,11 +48,28 @@ jobs:
           tags: |
             gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
             gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:latest
-  CD:
+  CD-Homolog:
     needs: [CI]
     uses: wesleymlopes/primeira-pipeline-cicd/.github/workflows/deploy.yaml@main
     with:
-      namespace: homolog
+      environment: homologacao
+      manifests: k8s/deployment.yaml
+      images: gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
+    secrets: inherit
+
+  Teste-Ambiente:
+    needs: [CD-Homolog]
+    runs-on: ubuntu-latest
+    environment: homologacao
+    steps:
+      - name: FAke Teste
+        run: "Fake teste de ambiente ${{vars.APP_NAMESPACE}}"
+  
+  CD-Producao:
+    needs: [Teste-Ambiente]
+    uses: wesleymlopes/primeira-pipeline-cicd/.github/workflows/deploy.yaml@main
+    with:
+      environment: producao
       manifests: k8s/deployment.yaml
       images: gru.ocir.io/grglog7bpvjm/primeira-pipeline-cicd:v${{ github.run_number }}
     secrets: inherit

@@ -10,15 +10,16 @@ on:
             type: string
             required: true
             description: "Imagens que serão alteradas nos manifestos"
-        namespace:
+        environment:
             type: string
             required: true
-            description: "Namespace que será feito Deploy"
+            description: "Nome do Ambiente que sera utilizado"
 
 jobs:
   deploy-k8s:
     name: CD - Deploy OKE
     runs-on: ubuntu-latest
+    environment: ${{inputs.environment}}
     steps:
 
       # ----------------------------------------------------------
@@ -110,9 +111,8 @@ jobs:
       - name: Aplicar Manifesto
         uses: Azure/k8s-deploy@v7
         with:
-          namespace: ${{inputs.namespace}}
+          namespace: ${{vars.APP_NAMESPACE}}
           manifests: ${{inputs.manifests}}
           images: ${{inputs.images}}
-          imagepullsecrets: |
-            ocir-secret
+          imagepullsecrets: ${{secrets.IMG_PULL}}
 
